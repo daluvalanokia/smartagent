@@ -1,0 +1,70 @@
+@model PromptRunResult
+@{
+    var prompt = Model.Prompts.FirstOrDefault();
+}
+
+<div class="actions">
+    <a asp-action="Index">&#8592; New run</a>
+    <a asp-action="Download" asp-route-id="@Model.RunId">Download prompt (.txt)</a>
+</div>
+
+<div class="stat-row">
+    <div class="stat"><div class="v">@Model.Snapshot.SourceName</div><div class="k">SOURCE (@Model.Snapshot.SourceType)</div></div>
+    <div class="stat"><div class="v">@Model.AllFindings.Count</div><div class="k">FINDINGS</div></div>
+    <div class="stat"><div class="v">@(prompt?.TargetFindings.Count ?? 0)</div><div class="k">IN SCOPE</div></div>
+    <div class="stat"><div class="v">@Model.Snapshot.TotalFiles</div><div class="k">FILES ANALYZED</div></div>
+</div>
+
+@if (Model.Prompts.Count == 0)
+{
+    <div class="panel">
+        <h1>No findings in this run</h1>
+        <p class="sub">@Model.Snapshot.SourceDetail — the analyzer found nothing actionable at the configured severity. Try a bigger scope limit or a different focus.</p>
+    </div>
+}
+else
+{
+    <div class="panel">
+        <h1>@prompt!.Title</h1>
+        <p class="sub">composed by: @prompt.Composer</p>
+        <div class="prompt-box">@prompt.Prompt</div>
+    </div>
+}
+
+<h2>Prioritized findings (all @Model.AllFindings.Count, sorted by priority score; starred = in scope)</h2>
+<table>
+    <thead>
+        <tr><th>ID</th><th>Priority</th><th>Severity</th><th>Category</th><th>Finding</th><th>Location</th></tr>
+    </thead>
+    <tbody>
+    @foreach (var f in Model.AllFindings.OrderByDescending(f => f.Score))
+    {
+        var inScope = prompt?.TargetFindings.Any(t => t.Id == f.Id) == true;
+        <tr style="@(inScope ? "opacity:1" : "opacity:0.55")">
+            <td>@f.Id @(inScope ? "★" : "")</td>
+            <td>@f.Score.ToString("F1")</td>
+            <td><span class="sev sev-@f.Severity.ToString().ToLowerInvariant()">@f.Severity</span></td>
+            <td>@f.Category</td>
+            <td>
+                <b>@f.Title</b><br />@f.Description
+                @if (!string.IsNullOrWhiteSpace(f.ReasoningNote))
+                {
+                    <br /><span class="warn">@f.ReasoningNote</span>
+                }
+            </td>
+            <td><code>@f.FilePath:@f.Line</code></td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+@if (Model.Warnings.Count > 0)
+{
+    <h2>Integration warnings</h2>
+    <ul class="warn">
+        @foreach (var w in Model.Warnings)
+        {
+            <li>@w</li>
+        }
+    </ul>
+}

@@ -1,0 +1,88 @@
+@model RunInput
+@{
+    var active = Model.SourceType;
+}
+<div class="panel">
+    <h1>Generate a scoped, prioritized prompt</h1>
+    <p class="sub">SmartAgent inspects your app source and returns ONE consolidated prompt, limited to the top-priority findings of this run.</p>
+
+    <div asp-validation-summary="All" class="validation"></div>
+
+    <form asp-action="Run" method="post" enctype="multipart/form-data">
+        @Html.AntiForgeryToken()
+
+        <div class="source-tabs">
+            <a href="#" data-src="ZipArchive" class="@(active == SourceType.ZipArchive ? "active" : "")">a. Source as ZIP</a>
+            <a href="#" data-src="GitHub" class="@(active == SourceType.GitHub ? "active" : "")">b. Source from GitHub</a>
+            <a href="#" data-src="Website" class="@(active == SourceType.Website ? "active" : "")">c. App from website URL</a>
+        </div>
+
+        <input type="hidden" id="src" name="SourceType" value="@active" />
+
+        <div id="src-zip" style="display:@(active == SourceType.ZipArchive ? "block" : "none")">
+            <label for="ZipFile">ZIP archive of the app source</label>
+            <input type="file" name="ZipFile" accept=".zip" />
+            <div class="hint">Code files only; binaries and node_modules are skipped automatically. Max 100 MB.</div>
+        </div>
+
+        <div id="src-github" style="display:@(active == SourceType.GitHub ? "block" : "none")">
+            <label for="GitHubUrl">GitHub repository URL</label>
+            <input type="url" name="GitHubUrl" value="@Model.GitHubUrl" placeholder="https://github.com/owner/repo" />
+            <div class="hint">Public repos work without a token. Default branch HEAD is fetched.</div>
+        </div>
+
+        <div id="src-website" style="display:@(active == SourceType.Website ? "block" : "none")">
+            <label for="WebsiteUrl">Website URL</label>
+            <input type="url" name="WebsiteUrl" value="@Model.WebsiteUrl" placeholder="https://example.com" />
+            <div class="hint">The live pages are crawled (same-site, up to 12 pages) and inspected for erratic behavior.</div>
+        </div>
+
+        <h2>Run scope</h2>
+        <div style="display:flex; gap:16px; flex-wrap:wrap">
+            <div style="flex:1; min-width:180px">
+                <label for="ScopeLimit">Scope limit (findings per prompt)</label>
+                <select name="ScopeLimit" id="ScopeLimit">
+                    @for (var i = 1; i <= 8; i++)
+                    {
+                        <option value="@i" selected="@(Model.ScopeLimit == i)">@i</option>
+                    }
+                </select>
+                <div class="hint">Keep it small: a limited scope produces a precise, actionable prompt.</div>
+            </div>
+            <div style="flex:1; min-width:180px">
+                <label for="Focus">Prioritize</label>
+                <select name="Focus" id="Focus">
+                    <option value="Balanced" selected="@(Model.Focus == FocusArea.Balanced)">Balanced (quality)</option>
+                    <option value="Functionality" selected="@(Model.Focus == FocusArea.Functionality)">Functionality improvements</option>
+                    <option value="Stability" selected="@(Model.Focus == FocusArea.Stability)">Erratic behavior / stability</option>
+                </select>
+                <div class="hint">Boosts matching findings in the priority score.</div>
+            </div>
+        </div>
+
+        <label for="Notes">Operator notes (optional)</label>
+        <textarea name="Notes" placeholder="e.g. users report the search page intermittently fails">@Model.Notes</textarea>
+
+        <button type="submit">Run SmartAgent</button>
+    </form>
+</div>
+
+<div class="panel">
+    <h2>How a run works</h2>
+    <p class="sub">fetch source → heuristic analysis → external reasoning-site enrichment → priority scoring → top-N scoped consolidation (AI provider, or built-in template offline)</p>
+</div>
+
+<script>
+    document.querySelectorAll('.source-tabs a').forEach(function (tab) {
+        tab.addEventListener('click', function (e) {
+            e.preventDefault();
+            var src = tab.getAttribute('data-src');
+            document.getElementById('src').value = src;
+            document.querySelectorAll('.source-tabs a').forEach(function (t) { t.classList.remove('active'); });
+            tab.classList.add('active');
+            document.getElementById('src-zip').style.display = src === 'ZipArchive' ? 'block' : 'none';
+            document.getElementById('src-github').style.display = src === 'GitHub' ? 'block' : 'none';
+            document.getElementById('src-website').style.display = src === 'Website' ? 'block' : 'none';
+        });
+    });
+</script>
