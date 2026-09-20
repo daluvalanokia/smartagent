@@ -7,6 +7,10 @@ namespace SmartAgent.Core;
 /// The output is the heart of the "consolidated and precise, limited scope"
 /// contract: only the top <see cref="RunOptions.ScopeLimit"/> findings
 /// (after de-duplication) survive into the prompt.
+///
+/// CI/CD continuity: findings that persist across runs escalate (up to +45%),
+/// regressions (previously fixed, now back) get a hard 1.5× boost, and
+/// findings suppressed by WontFix feedback never enter a prompt.
 /// </summary>
 public sealed class Prioritizer
 {
@@ -48,21 +52,37 @@ public sealed class Prioritizer
         double Score(Finding f) =>
             SeverityWeight[f.Severity] * BaseCategoryWeight[f.Category]
             * (focus.TryGetValue(f.Category, out var b) ? b : 1.0)
-            * (f.ReasoningNote is null ? 1.0 : 1.05);   // reasoning-enriched findings get a nudge
+            * (f.ReasoningNote is null ? 1.0 : 1.05)          // reasoning-enriched findings get a nudge
+            * ContinuityBoost(f);
 
         // de-duplicate identical (rule, file, line) signals from overlapping scans
         var deduped = findings
+            .Where(f => !f.SuppressFromScope)                  // WontFix feedback suppresses
             .GroupBy(f => (f.Rule, f.FilePath, f.Line))
-            .Select(g => g.First())
+            .Select(g => g.OrderByDescending(f => f.Occurrences).First())   // keep the continuity-aware copy
             .ToList();
 
         foreach (var f in deduped) f.Score = Score(f);
 
+        // CI/CD gate semantics: a regression (previously fixed, now back) always
+        // enters the scope ahead of everything else — it failed the pipeline gate.
         return deduped
-            .OrderByDescending(f => f.Score)
+            .OrderByDescending(f => f.Continuity == ContinuityStatus.Regression ? 1 : 0)
+            .ThenByDescending(f => f.Score)
             .ThenBy(f => f.FilePath, StringComparer.OrdinalIgnoreCase)
             .ThenBy(f => f.Line)
             .Take(Math.Max(1, options.ScopeLimit))
             .ToList();
+    }
+
+    /// <summary>
+    /// Escalation: a finding seen in N runs grows (+15% per extra occurrence, capped at +45%);
+    /// a regression (fixed feedback, but back) jumps 1.5× so it tops the next prompt.
+    /// </summary>
+    private static double ContinuityBoost(Finding f)
+    {
+        var boost = 1.0 + 0.15 * Math.Min(Math.Max(f.Occurrences - 1, 0), 3);
+        if (f.Continuity == ContinuityStatus.Regression) boost *= 1.5;
+        return boost;
     }
 }

@@ -22,4 +22,15 @@ public sealed class Finding
     public double Score { get; set; }
     /// <summary>Extra context contributed by reasoning-site integrations.</summary>
     public string? ReasoningNote { get; set; }
+
+    // --- CI/CD continuity state (stamped by ContinuityRegistry before prioritization) ---
+
+    /// <summary>Stable cross-run identity (target key + file + rule + title hash).</summary>
+    public string Fingerprint { get; set; } = string.Empty;
+    /// <summary>Whether this finding was seen in earlier runs for the same target.</summary>
+    public ContinuityStatus Continuity { get; set; } = ContinuityStatus.New;
+    /// <summary>How many consecutive runs have reported this finding.</summary>
+    public int Occurrences { get; set; } = 1;
+    /// <summary>True when WontFix feedback suppresses this finding from prompts.</summary>
+    public bool SuppressFromScope { get; set; }
 }

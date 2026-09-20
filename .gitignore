@@ -5,3 +5,4 @@ obj/
 *.userprefs
 TestResults/
 [Ll]ogs/
+data/

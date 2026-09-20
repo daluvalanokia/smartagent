@@ -18,5 +18,11 @@ public sealed class PromptRunResult
     public required SourceSnapshot Snapshot { get; init; }
     public required IReadOnlyList<Finding> AllFindings { get; init; }
     public required IReadOnlyList<GeneratedPrompt> Prompts { get; init; }
+    /// <summary>Stable cross-run identity of the analyzed target.</summary>
+    public string TargetKey { get; init; } = string.Empty;
+    /// <summary>Cross-run continuity diff for this target (CI/CD coordination).</summary>
+    public ContinuityReport? Continuity { get; init; }
+    /// <summary>1-based run number for this target (from continuity history).</summary>
+    public int RunNumber => Continuity?.RunNumber ?? 1;
     public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
 }

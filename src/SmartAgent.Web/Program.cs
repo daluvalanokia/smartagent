@@ -11,6 +11,7 @@ using SmartAgent.Web.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
+builder.Services.AddControllers();   // CI/CD API surface (api/validate, runs, feedback, targets)
 builder.Services.Configure<RunOptions>(o => { });  // sensible defaults from domain
 
 builder.Services.AddSingleton<AiProviderOptions>(builder.Configuration.GetSection(AiProviderOptions.SectionName).Get<AiProviderOptions>() ?? new());
@@ -61,10 +62,19 @@ builder.Services.AddScoped<SmartAgentEngine>();
 // In-memory store of run results (bounded; demo-suitable).
 builder.Services.AddSingleton<RunStore>();
 
+// CI/CD continuity registry: persisted cross-run finding history per target.
+builder.Services.AddSingleton<ContinuityRegistry>(sp =>
+{
+    var path = sp.GetRequiredService<IConfiguration>()["SmartAgent:Continuity:StorePath"] ?? "data/continuity.json";
+    var env = sp.GetRequiredService<IWebHostEnvironment>();
+    return new ContinuityRegistry(Path.Combine(env.ContentRootPath, path));
+});
+
 var app = builder.Build();
 
 app.UseStaticFiles();
 app.UseRouting();
+app.MapControllers();
 app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();

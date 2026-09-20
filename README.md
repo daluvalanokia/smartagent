@@ -8,8 +8,49 @@ precise prompt per run, limited to a prioritized scope** — tuned either toward
 
 ```
 source (a/b/c) → heuristic analysis → reasoning-site enrichment →
-priority scoring → top-N scope → consolidated prompt (AI provider, or
-built-in deterministic template when AI is offline)
+CONTINUITY MATCH (cross-run fingerprints, escalation, regressions) →
+priority scoring → top-N scope → chained consolidated prompt
+(AI provider, or built-in deterministic template when AI is offline)
+→ feedback loop (CI reports fixed / wont_fix) → next run verifies
+```
+
+## CI/CD prompt pipeline (continuity)
+
+Every run is part of a continuous loop per target:
+
+- findings get stable **fingerprints** (target + file + rule + title hash),
+  remembered across runs in a persisted registry (`data/continuity.json`)
+- **new** findings appear once; **persisting** ones escalate (+15%/run, cap +45%)
+- findings marked **fixed** via feedback are verified by the next run; if they
+  reappear they become **REGRESSIONS** (1.5× boost, forced to the top of scope)
+- findings marked **wont_fix** are suppressed from future prompts
+- each generated prompt chains with the previous run: continuity summary,
+  verification requirements, and next steps with the feedback endpoint
+- a CI pipeline gates a build on `continuity.regressions == 0`
+
+### HTTP API (for CI pipelines)
+
+| Endpoint | Use |
+|----------|-----|
+| `POST /api/validate` | run a validation; body `{ sourceType: website\|github\|zipArchive, sourceRef, scopeLimit, focus, notes }` → runId, continuity diff, chained prompt, findings with fingerprints (zip source: sourceRef = base64 ZIP) |
+| `GET /api/runs/{runId}` | stored run (prompt + findings + continuity) |
+| `POST /api/runs/{runId}/feedback` | `{ feedback: [{ fingerprint, status: fixed\|wont_fix\|failed_verification, note }] }` — reports the outcome of applying the prompt |
+| `GET /api/targets` | all targets with run counts and pending fix verifications |
+| `GET /api/targets/{targetKey}/history` | full cross-run finding timeline for a target |
+| `GET /api/health` | pipeline health |
+
+Optional shared-secret guard: set `SmartAgent:ApiKey` in configuration and send
+it as `X-Api-Key` on every call.
+
+### Example: GitHub Actions step
+
+```yaml
+- name: SmartAgent validation
+  run: |
+    RESULT=$(curl -s -X POST $SMARTAGENT_URL/api/validate       -H "X-Api-Key: $SMARTAGENT_KEY" -H "Content-Type: application/json"       -d '{"sourceType":"github","sourceRef":"https://github.com/org/repo","scopeLimit":3,"focus":"stability"}')
+    REGRESSIONS=$(echo "$RESULT" | jq '.continuity.regressions')
+    echo "$RESULT" | jq -r '.prompt'
+    if [ "$REGRESSIONS" != "0" ]; then echo "::error::regressions detected"; exit 1; fi
 ```
 
 ## Source inputs

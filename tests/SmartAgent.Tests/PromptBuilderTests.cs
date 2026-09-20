@@ -30,12 +30,13 @@ public class PromptBuilderTests
     public async Task Falls_back_to_deterministic_template_when_ai_offline()
     {
         var builder = new PromptBuilder(new OfflineClient());
-        var result = await builder.BuildAsync(Snap(), [F()], RunOptions.Default, CancellationToken.None);
+        var result = await builder.BuildAsync(Snap(), [F()], RunOptions.Default, null, Guid.NewGuid(), CancellationToken.None);
 
         Assert.Contains("Objective", result.Prompt);
         Assert.Contains("Required changes", result.Prompt);
         Assert.Contains("Acceptance criteria", result.Prompt);
         Assert.Contains("a.cs", result.Prompt);
+        Assert.Contains("Next steps (CI/CD loop)", result.Prompt);
         Assert.Equal(1, result.TargetFindings.Count);
     }
 
@@ -43,7 +44,42 @@ public class PromptBuilderTests
     public async Task Empty_scope_produces_placeholder_title()
     {
         var builder = new PromptBuilder(new OfflineClient());
-        var result = await builder.BuildAsync(Snap(), [], RunOptions.Default, CancellationToken.None);
+        var result = await builder.BuildAsync(Snap(), [], RunOptions.Default, null, Guid.NewGuid(), CancellationToken.None);
         Assert.Contains("No actionable findings", result.Title);
+    }
+
+    [Fact]
+    public async Task Chained_prompt_references_previous_run_and_regressions()
+    {
+        var continuity = new ContinuityReport
+        {
+            TargetKey = "site:demo.test", TargetName = "demo.test", RunNumber = 4,
+            PreviousRunUtc = DateTimeOffset.UtcNow.AddDays(-2),
+            PreviousPromptTitle = "Improve stability: erratic behavior (2 scoped finding(s))",
+            RegressionFindings =
+            [
+                new TrackedFinding { Fingerprint = "ABC", Rule = "dead-link", Title = "Dead link", FilePath = "index.html", LastLine = 12,
+                    FeedbackStatus = FeedbackStatus.Fixed, FeedbackNote = "claimed fixed in PR 42" }
+            ],
+            PersistingFindings =
+            [
+                new TrackedFinding { Fingerprint = "DEF", Rule = "xss-sink", Title = "XSS sink", FilePath = "app.js", LastLine = 5, Occurrences = 3 }
+            ]
+        };
+
+        // the scoped finding itself is persisting (seen 3 runs) so the tag appears in Required changes
+        var scoped = F();
+        scoped.Continuity = ContinuityStatus.Persisting;
+        scoped.Occurrences = 3;
+
+        var builder = new PromptBuilder(new OfflineClient());
+        var result = await builder.BuildAsync(Snap(), [scoped], RunOptions.Default, continuity, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Contains("run #4", result.Prompt);
+        Assert.Contains("REGRESSIONS", result.Prompt);
+        Assert.Contains("persisting, seen 3 run(s)", result.Prompt);
+        Assert.Contains("Verification of previous fixes", result.Prompt);
+        Assert.Contains("/feedback", result.Prompt);
+        Assert.Contains("run #4", result.Title);
     }
 }
