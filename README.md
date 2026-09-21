@@ -14,6 +14,33 @@ priority scoring → top-N scope → chained consolidated prompt
 → feedback loop (CI reports fixed / wont_fix) → next run verifies
 ```
 
+## Parallel prompt evaluator (scope/depth/width algorithm)
+
+Paste ANY prompt (SmartAgent's own generated prompts or external ones) and the
+evaluator automatically:
+
+1. **Segments** it into independently evaluable work units — numbered items,
+   finding references `[F001]`/fingerprints, bullets, markdown sections, or
+   sentence groups for free prose (so nothing is unevaluable)
+2. **Estimates depth** per unit (1–5): length, file spread and hard-domain
+   signals (security, migration, concurrency, audit …) → per-unit cost
+3. **Derives the width**: threads actually spawned = min(units, MaxThreads, CPU)
+4. **Splits the work**: LPT (longest-processing-time-first) bin packing balances
+   units into parallel lanes so no thread idles behind a heavy unit
+5. **Runs the lanes concurrently** — one worker per lane, units within a lane
+   sequential — with per-unit timeout, bounded retries and failure tolerance
+   (a failed unit is recorded, never kills the run)
+6. **Consolidates** all unit results into one report with a scope-satisfaction
+   check: every planned unit must have a result (failures are accounted, gaps
+   are not → `scopeSatisfied: false`)
+
+- UI: `/Home/Evaluate`
+- API: `POST /api/evaluate-prompt` `{ prompt, maxThreads?, retriesPerUnit? }`
+  → plan (units, depth, lanes) + per-unit results + consolidated report
+
+Deterministic by default (heuristic unit evaluator); swap `IWorkUnitEvaluator`
+for an AI-backed implementation without touching the executor.
+
 ## CI/CD prompt pipeline (continuity)
 
 Every run is part of a continuous loop per target:

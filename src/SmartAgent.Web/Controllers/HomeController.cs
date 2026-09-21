@@ -6,7 +6,7 @@ using SmartAgent.Web.Services;
 
 namespace SmartAgent.Web.Controllers;
 
-public class HomeController(SmartAgentEngine engine, RunStore runStore, ILogger<HomeController> logger) : Controller
+public class HomeController(SmartAgentEngine engine, RunStore runStore, PromptEvaluator promptEvaluator, ILogger<HomeController> logger) : Controller
 {
     [HttpGet]
     public IActionResult Index() => View(new RunInput());
@@ -120,5 +120,36 @@ public class HomeController(SmartAgentEngine engine, RunStore runStore, ILogger<
         }
         return File(System.Text.Encoding.UTF8.GetBytes(sb.ToString()), "text/plain; charset=utf-8",
             $"smartagent-run-{id}.txt");
+    }
+
+    // ---------- parallel prompt evaluation (scope/depth/width algorithm) ----------
+
+    [HttpGet]
+    public IActionResult Evaluate() => View(new PromptEvaluationInput());
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Evaluate(PromptEvaluationInput input, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(input.Prompt) || input.Prompt.Trim().Length < 20)
+        {
+            ModelState.AddModelError(nameof(input.Prompt), "Paste a prompt of at least 20 characters to evaluate.");
+            return View(input);
+        }
+
+        try
+        {
+            var options = new EvaluationOptions
+            {
+                MaxThreads = input.MaxThreads is >= 1 and <= 32 ? input.MaxThreads.Value : EvaluationOptions.Default.MaxThreads
+            };
+            var report = await promptEvaluator.EvaluateAsync(input.Prompt, options, null, ct);
+            return View("EvaluateResult", report);
+        }
+        catch (ArgumentException ex)
+        {
+            ModelState.AddModelError(nameof(input.Prompt), ex.Message);
+            return View(input);
+        }
     }
 }

@@ -17,3 +17,12 @@ public class RunInput
     public FocusArea Focus { get; set; } = FocusArea.Balanced;
     public string? Notes { get; set; }
 }
+
+public class PromptEvaluationInput
+{
+    /// <summary>Any prompt text: numbered requirements, bullets, sections or free prose.</summary>
+    public string? Prompt { get; set; }
+
+    /// <summary>Max concurrent evaluation threads (blank = CPU count).</summary>
+    public int? MaxThreads { get; set; }
+}

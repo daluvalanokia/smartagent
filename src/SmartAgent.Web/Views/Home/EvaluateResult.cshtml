@@ -1,0 +1,57 @@
+@model SmartAgent.Domain.EvaluationReport
+@{
+    ViewData["Title"] = "Evaluation Report";
+}
+<div class="actions"><a href="/Home/Evaluate">&larr; evaluate another prompt</a> <a href="/">&larr; new run</a></div>
+
+<div class="stat-row">
+    <div class="stat"><div class="v">@Model.Plan.Units.Count</div><div class="k">WORK UNITS</div></div>
+    <div class="stat"><div class="v">@Model.Plan.Width</div><div class="k">THREADS (WIDTH)</div></div>
+    <div class="stat"><div class="v">@Model.Plan.Waves.Count</div><div class="k">THREAD LANES</div></div>
+    <div class="stat"><div class="v">@Model.Plan.AverageDepth.ToString("F1")</div><div class="k">AVG DEPTH (1–5)</div></div>
+    <div class="stat"><div class="v">@Model.UnitsEvaluated</div><div class="k">SUCCEEDED</div></div>
+    <div class="stat"><div class="v">@(Model.UnitsFailed > 0 ? $"⚠ {Model.UnitsFailed}" : Model.UnitsFailed.ToString())</div><div class="k">FAILED</div></div>
+    <div class="stat"><div class="v">@(Model.ScopeSatisfied ? "YES" : "NO")</div><div class="k">SCOPE SATISFIED</div></div>
+</div>
+
+<div class="panel">
+    <h1>Consolidated summary</h1>
+    <div class="prompt-box">@Model.Summary</div>
+</div>
+
+<h2>Execution plan</h2>
+<table>
+    <tr><th>Unit</th><th>Extracted from</th><th>Depth</th><th>Cost</th><th>Lane</th><th>Files touched</th><th>Excerpt</th></tr>
+    @foreach (var u in Model.Plan.Units.OrderBy(u => u.Order))
+    {
+        <tr>
+            <td><b>@u.Id</b></td>
+            <td>@u.Source</td>
+            <td>@u.Depth</td>
+            <td>@u.Cost</td>
+            <td>@(Enumerable.Range(0, Model.Plan.Waves.Count).First(i => Model.Plan.Waves[i].Contains(u.Id)) + 1)</td>
+            <td>@string.Join(", ", u.FileTargets)</td>
+            <td>@(u.Text.Length <= 90 ? u.Text : u.Text[..87] + "…")</td>
+        </tr>
+    }
+</table>
+
+<h2>Per-unit results (consolidated from parallel threads)</h2>
+<table>
+    <tr><th>Unit</th><th>Status</th><th>Complexity</th><th>Effort</th><th>Risk</th><th>Attempts</th><th>Findings / actions</th></tr>
+    @foreach (var r in Model.Results)
+    {
+        <tr>
+            <td><b>@r.UnitId</b></td>
+            <td>@(r.Failed ? $"FAILED: {r.Error}" : "OK")</td>
+            <td>@r.Complexity/10</td>
+            <td>@r.Effort</td>
+            <td>@r.Risk</td>
+            <td>@r.Attempts</td>
+            <td>
+                @foreach (var f in r.Findings) { <div>@f</div> }
+                @foreach (var a in r.SuggestedActions) { <div class="warn">→ @a</div> }
+            </td>
+        </tr>
+    }
+</table>

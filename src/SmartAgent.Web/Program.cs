@@ -59,6 +59,13 @@ builder.Services.AddSingleton<Prioritizer>();
 builder.Services.AddScoped<PromptBuilder>();
 builder.Services.AddScoped<SmartAgentEngine>();
 
+// Parallel prompt-evaluation pipeline: plan → bounded multi-thread execution → consolidation.
+builder.Services.AddSingleton<WorkPlanner>();
+builder.Services.AddSingleton<IWorkUnitEvaluator, HeuristicWorkUnitEvaluator>();
+builder.Services.AddSingleton<ParallelWorkExecutor>();
+builder.Services.AddSingleton<PromptConsolidator>();
+builder.Services.AddSingleton<PromptEvaluator>();
+
 // In-memory store of run results (bounded; demo-suitable).
 builder.Services.AddSingleton<RunStore>();
 

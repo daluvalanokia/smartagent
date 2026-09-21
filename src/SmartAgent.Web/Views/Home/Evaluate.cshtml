@@ -1,0 +1,17 @@
+@model SmartAgent.Web.Models.PromptEvaluationInput
+@{
+    ViewData["Title"] = "Prompt Evaluator";
+}
+<div class="panel">
+    <h1>Parallel prompt evaluator</h1>
+    <p class="sub">Paste any prompt. The planner derives its scope (work units), depth and width automatically, splits the units into balanced waves, evaluates them on multiple threads, and consolidates the results.</p>
+    <form asp-action="Evaluate" method="post">
+        @Html.AntiForgeryToken()
+        <p><textarea asp-for="Prompt" rows="12" placeholder="Paste a prompt — numbered requirements, bullets, sections, or free prose…"></textarea></p>
+        <div class="actions">
+            <label>Max threads (blank = CPU count): <input asp-for="MaxThreads" type="number" min="1" max="32" style="width:90px" /></label>
+            <button type="submit">Evaluate in parallel</button>
+        </div>
+        <div asp-validation-summary="All" class="warn"></div>
+    </form>
+</div>

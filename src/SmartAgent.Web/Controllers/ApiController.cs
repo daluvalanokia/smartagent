@@ -19,6 +19,7 @@ public sealed class ApiController(
     SmartAgentEngine engine,
     RunStore runStore,
     ContinuityRegistry continuity,
+    PromptEvaluator promptEvaluator,
     IConfiguration config) : ControllerBase
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -176,6 +177,67 @@ public sealed class ApiController(
             OpenFindings = h.Findings.Count(t => t.LastSeenRunNumber == h.RunCount),
             PendingFixVerification = h.Findings.Count(t => t.FeedbackStatus == FeedbackStatus.Fixed)
         }).ToList());
+    }
+
+
+    /// <summary>
+    /// Parallel prompt evaluation: analyzes ANY prompt, derives its scope (work units),
+    /// depth and width automatically, runs the units on multiple threads in balanced
+    /// waves, and consolidates the results into one report (scope-satisfaction check).
+    /// </summary>
+    [HttpPost("evaluate-prompt")]
+    public async Task<IActionResult> EvaluatePrompt([FromBody] EvaluatePromptRequest body, CancellationToken ct)
+    {
+        if (!Authorized()) return Unauthorized();
+        if (body is null || string.IsNullOrWhiteSpace(body.Prompt) || body.Prompt.Trim().Length < 20)
+            return BadRequest(new { error = "prompt is required (at least 20 characters)." });
+
+        var options = new EvaluationOptions
+        {
+            MaxThreads = body.MaxThreads is >= 1 and <= 32 ? body.MaxThreads.Value : EvaluationOptions.Default.MaxThreads,
+            RetriesPerUnit = body.RetriesPerUnit is >= 0 and <= 3 ? body.RetriesPerUnit.Value : 1
+        };
+
+        try
+        {
+            var report = await promptEvaluator.EvaluateAsync(body.Prompt, options, null, ct);
+            return Ok(new EvaluatePromptResponse
+            {
+                Plan = new PlanDto
+                {
+                    PromptPreview = report.Plan.PromptPreview,
+                    Units = report.Plan.Units.Count,
+                    Width = report.Plan.Width,
+                    Waves = report.Plan.Waves.Count,
+                    TotalCost = report.Plan.TotalCost,
+                    AverageDepth = Math.Round(report.Plan.AverageDepth, 2),
+                    UnitDetails = report.Plan.Units.Select(u => new PlanUnitDto
+                    {
+                        Id = u.Id, Order = u.Order, Source = u.Source, Depth = u.Depth, Cost = u.Cost,
+                        FileTargets = u.FileTargets.ToList(), Wave = Enumerable.Range(0, report.Plan.Waves.Count).First(i => report.Plan.Waves[i].Contains(u.Id)) + 1,
+                        Text = u.Text.Length <= 200 ? u.Text : u.Text[..197] + "…"
+                    }).ToList()
+                },
+                UnitsEvaluated = report.UnitsEvaluated,
+                UnitsFailed = report.UnitsFailed,
+                ScopeSatisfied = report.ScopeSatisfied,
+                DominantRisk = report.DominantRisk,
+                TotalEffort = report.TotalEffort,
+                ElapsedMs = report.TotalElapsedMs,
+                Summary = report.Summary,
+                Results = report.Results.Select(r => new UnitResultDto
+                {
+                    UnitId = r.UnitId, Failed = r.Failed, Error = r.Error,
+                    Complexity = r.Complexity, Effort = r.Effort, Risk = r.Risk,
+                    Findings = r.Findings.ToList(), SuggestedActions = r.SuggestedActions.ToList(),
+                    Attempts = r.Attempts, ElapsedMs = r.ElapsedMs
+                }).ToList()
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpGet("health")]
@@ -339,6 +401,65 @@ public sealed class TrackedFindingDto
     public int Occurrences { get; set; }
     public int FirstSeenRunNumber { get; set; }
     public int LastSeenRunNumber { get; set; }
+}
+
+public sealed class EvaluatePromptRequest
+{
+    /// <summary>Any prompt text: numbered requirements, bullets, sections or free prose.</summary>
+    public string? Prompt { get; set; }
+    /// <summary>Max concurrent evaluation threads; default = CPU count.</summary>
+    public int? MaxThreads { get; set; }
+    public int? RetriesPerUnit { get; set; }
+}
+
+public sealed class EvaluatePromptResponse
+{
+    public PlanDto Plan { get; set; } = new();
+    public int UnitsEvaluated { get; set; }
+    public int UnitsFailed { get; set; }
+    public bool ScopeSatisfied { get; set; }
+    public string DominantRisk { get; set; } = string.Empty;
+    public int TotalEffort { get; set; }
+    public long ElapsedMs { get; set; }
+    public string Summary { get; set; } = string.Empty;
+    public List<UnitResultDto> Results { get; set; } = [];
+}
+
+public sealed class PlanDto
+{
+    public string PromptPreview { get; set; } = string.Empty;
+    public int Units { get; set; }
+    public int Width { get; set; }
+    public int Waves { get; set; }
+    public int TotalCost { get; set; }
+    public double AverageDepth { get; set; }
+    public List<PlanUnitDto> UnitDetails { get; set; } = [];
+}
+
+public sealed class PlanUnitDto
+{
+    public string Id { get; set; } = string.Empty;
+    public int Order { get; set; }
+    public string Source { get; set; } = string.Empty;
+    public int Depth { get; set; }
+    public int Cost { get; set; }
+    public int Wave { get; set; }
+    public List<string> FileTargets { get; set; } = [];
+    public string Text { get; set; } = string.Empty;
+}
+
+public sealed class UnitResultDto
+{
+    public string UnitId { get; set; } = string.Empty;
+    public bool Failed { get; set; }
+    public string? Error { get; set; }
+    public int Complexity { get; set; }
+    public int Effort { get; set; }
+    public string Risk { get; set; } = string.Empty;
+    public List<string> Findings { get; set; } = [];
+    public List<string> SuggestedActions { get; set; } = [];
+    public int Attempts { get; set; }
+    public long ElapsedMs { get; set; }
 }
 
 public sealed class TargetSummaryDto
