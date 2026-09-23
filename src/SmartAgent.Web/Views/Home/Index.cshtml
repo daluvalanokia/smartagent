@@ -2,7 +2,7 @@
 @{
     var active = Model.SourceType;
 }
-<div class="actions"><a href="/Home/Evaluate">Parallel prompt evaluator →</a> <a href="/Home/Saael">SAAEL lifecycle orchestrator →</a> <a href="/Home/AnalyzeApp">Browser app analysis →</a></div>
+<div class="actions"><a href="/Home/Evaluate">Parallel prompt evaluator →</button> <a href="/Home/Saael">SAAEL lifecycle orchestrator →</button> <a href="/Home/AnalyzeApp">Browser app analysis →</button></div>
 <div class="panel">
     <h1>Generate a scoped, prioritized prompt</h1>
     <p class="sub">SmartAgent inspects your app source and returns ONE consolidated prompt, limited to the top-priority findings of this run.</p>
@@ -13,28 +13,28 @@
         @Html.AntiForgeryToken()
 
         <div class="source-tabs">
-            <a href="#" data-src="ZipArchive" class="@(active == SourceType.ZipArchive ? "active" : "")">a. Source as ZIP</a>
-            <a href="#" data-src="GitHub" class="@(active == SourceType.GitHub ? "active" : "")">b. Source from GitHub</a>
-            <a href="#" data-src="Website" class="@(active == SourceType.Website ? "active" : "")">c. App from website URL</a>
+            <button type="button" data-src="ZipArchive" class="@(active == SourceType.ZipArchive ? "active" : "")">a. Source as ZIP</a>
+            <button type="button" data-src="GitHub" class="@(active == SourceType.GitHub ? "active" : "")">b. Source from GitHub</a>
+            <button type="button" data-src="Website" class="@(active == SourceType.Website ? "active" : "")">c. App from website URL</a>
         </div>
 
         <input type="hidden" id="src" name="SourceType" value="@active" />
 
         <div id="src-zip" style="display:@(active == SourceType.ZipArchive ? "block" : "none")">
             <label for="ZipFile">ZIP archive of the app source</label>
-            <input type="file" name="ZipFile" accept=".zip" />
+            <input type="file" id="ZipFile" name="ZipFile" accept=".zip" required />
             <div class="hint">Code files only; binaries and node_modules are skipped automatically. Max 100 MB.</div>
         </div>
 
         <div id="src-github" style="display:@(active == SourceType.GitHub ? "block" : "none")">
             <label for="GitHubUrl">GitHub repository URL</label>
-            <input type="url" name="GitHubUrl" value="@Model.GitHubUrl" placeholder="https://github.com/owner/repo" />
+            <input type="url" id="GitHubUrl" name="GitHubUrl" value="@Model.GitHubUrl" required placeholder="https://github.com/owner/repo" />
             <div class="hint">Public repos work without a token. Default branch HEAD is fetched.</div>
         </div>
 
         <div id="src-website" style="display:@(active == SourceType.Website ? "block" : "none")">
             <label for="WebsiteUrl">Website URL</label>
-            <input type="url" name="WebsiteUrl" value="@Model.WebsiteUrl" placeholder="https://example.com" />
+            <input type="url" id="WebsiteUrl" name="WebsiteUrl" value="@Model.WebsiteUrl" required placeholder="https://example.com" />
             <div class="hint">The live pages are crawled (same-site, up to 12 pages) and inspected for erratic behavior.</div>
         </div>
 
@@ -74,16 +74,19 @@
 </div>
 
 <script>
-    document.querySelectorAll('.source-tabs a').forEach(function (tab) {
+    document.querySelectorAll('.source-tabs a, .source-tabs button').forEach(function (tab) {
         tab.addEventListener('click', function (e) {
             e.preventDefault();
             var src = tab.getAttribute('data-src');
             document.getElementById('src').value = src;
-            document.querySelectorAll('.source-tabs a').forEach(function (t) { t.classList.remove('active'); });
+            document.querySelectorAll('.source-tabs a, .source-tabs button').forEach(function (t) { t.classList.remove('active'); });
             tab.classList.add('active');
-            document.getElementById('src-zip').style.display = src === 'ZipArchive' ? 'block' : 'none';
-            document.getElementById('src-github').style.display = src === 'GitHub' ? 'block' : 'none';
-            document.getElementById('src-website').style.display = src === 'Website' ? 'block' : 'none';
+            ['zip', 'github', 'website'].forEach(function (t) {
+                var div = document.getElementById('src-' + t);
+                var activeTab = (src === 'ZipArchive' && t === 'zip') || (src === 'GitHub' && t === 'github') || (src === 'Website' && t === 'website');
+                div.style.display = activeTab ? 'block' : 'none';
+                div.querySelectorAll('input').forEach(function (i) { i.disabled = !activeTab; });
+            });
         });
     });
 </script>

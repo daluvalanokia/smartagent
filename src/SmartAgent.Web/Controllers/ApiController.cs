@@ -28,6 +28,18 @@ public sealed class ApiController(
     // ---------- CI/CD loop ----------
 
     /// <summary>Runs a full validation for a target and returns the chained prompt plus continuity diff.</summary>
+    private static ParallelThreadSummary? ParallelDto(EvaluationReport? r) => r is null ? null : new ParallelThreadSummary
+    {
+        Units = r.Plan.Units.Count,
+        Threads = r.Plan.Width,
+        UnitsFailed = r.UnitsFailed,
+        TotalEffort = r.TotalEffort,
+        ScopeSatisfied = r.ScopeSatisfied,
+        DominantRisk = r.DominantRisk,
+        ElapsedMs = r.TotalElapsedMs,
+        Summary = r.Summary
+    };
+
     [HttpPost("validate")]
     [RequestSizeLimit(60_000_000)]
     public async Task<ActionResult<ValidateResponse>> Validate([FromBody] ValidateRequest body, CancellationToken ct)
@@ -40,7 +52,8 @@ public sealed class ApiController(
         {
             ScopeLimit = body.ScopeLimit is > 0 and <= 8 ? body.ScopeLimit.Value : 3,
             Focus = Enum.TryParse<FocusArea>(body.Focus, ignoreCase: true, out var focus) ? focus : FocusArea.Balanced,
-            Notes = body.Notes
+            Notes = body.Notes,
+            MaxThreads = body.MaxThreads is >= 1 and <= 64 ? body.MaxThreads.Value : null
         };
 
         SourceRequest request;
@@ -74,6 +87,7 @@ public sealed class ApiController(
             Findings = result.AllFindings.Select(FindingDto.From).ToList(),
             PromptTitle = result.Prompts.FirstOrDefault()?.Title,
             Prompt = result.Prompts.FirstOrDefault()?.Prompt,
+            Parallel = ParallelDto(result.ParallelReport),
             Warnings = result.Warnings.ToList()
         });
     }
@@ -95,6 +109,7 @@ public sealed class ApiController(
             Findings = r.AllFindings.Select(FindingDto.From).ToList(),
             PromptTitle = r.Prompts.FirstOrDefault()?.Title,
             Prompt = r.Prompts.FirstOrDefault()?.Prompt,
+            Parallel = ParallelDto(r.ParallelReport),
             Warnings = r.Warnings.ToList()
         });
     }
@@ -459,6 +474,22 @@ public sealed class ValidateRequest
     public int? ScopeLimit { get; set; }
     public string? Focus { get; set; }
     public string? Notes { get; set; }
+    /// <summary>Upper bound on parallel threads for the automatic prompt split (default: CPU count, min 2).</summary>
+    public int? MaxThreads { get; set; }
+}
+
+public sealed class ParallelThreadSummary
+{
+    /// <summary>True: every prompt is automatically reviewed, split, and parallel-processed.</summary>
+    public bool AutoParallel { get; init; } = true;
+    public int Units { get; init; }
+    public int Threads { get; init; }
+    public int UnitsFailed { get; init; }
+    public int TotalEffort { get; init; }
+    public bool ScopeSatisfied { get; init; }
+    public string DominantRisk { get; init; } = "Low";
+    public long ElapsedMs { get; init; }
+    public string Summary { get; init; } = string.Empty;
 }
 
 public sealed class ValidateResponse
@@ -470,6 +501,7 @@ public sealed class ValidateResponse
     public List<FindingDto> Findings { get; set; } = [];
     public string? PromptTitle { get; set; }
     public string? Prompt { get; set; }
+    public ParallelThreadSummary? Parallel { get; set; }
     public List<string> Warnings { get; set; } = [];
 }
 

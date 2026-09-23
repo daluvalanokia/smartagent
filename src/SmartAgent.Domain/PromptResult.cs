@@ -25,4 +25,7 @@ public sealed class PromptRunResult
     /// <summary>1-based run number for this target (from continuity history).</summary>
     public int RunNumber => Continuity?.RunNumber ?? 1;
     public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
+    /// <summary>Automatic parallel-thread report: EVERY built prompt is reviewed, split into
+    /// work units, processed on parallel lanes, and consolidated here — no opt-in needed.</summary>
+    public EvaluationReport? ParallelReport { get; init; }
 }

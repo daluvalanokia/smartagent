@@ -197,7 +197,7 @@ public sealed partial class AppAnalyzerAgent
     private static partial Regex JsUrlLinkRegex();
     [GeneratedRegex(@"href\s*=\s*[""']#[""']", RegexOptions.IgnoreCase)]
     private static partial Regex DeadLinkRegex();
-    [GeneratedRegex(@"<input\b(?![^>]*\b(?:aria-label|id=))(?![^>]*>[\s\S]*?</label>)", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"<input\b(?![^>]*\btype\s*=\s*[""']hidden)(?![^>]*\b(?:aria-label|id=))(?![^>]*>[\s\S]*?</label>)", RegexOptions.IgnoreCase)]
     private static partial Regex LabellessInputRegex();
     [GeneratedRegex(@"<img\b(?![^>]*\balt\s*=)", RegexOptions.IgnoreCase)]
     private static partial Regex AltlessImgRegex();

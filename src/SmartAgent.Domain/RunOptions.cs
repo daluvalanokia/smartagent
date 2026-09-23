@@ -11,6 +11,8 @@ public sealed class RunOptions
     public FocusArea Focus { get; init; } = FocusArea.Balanced;
     /// <summary>Free-text context the operator wants considered.</summary>
     public string? Notes { get; init; }
+    /// <summary>Upper bound on parallel threads for the automatic prompt split. Default: processor count (min 2).</summary>
+    public int? MaxThreads { get; init; }
 
     public static RunOptions Default => new();
 }

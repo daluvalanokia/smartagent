@@ -84,6 +84,22 @@ public class AppAnalyzerTests
     }
 
     [Fact]
+    public void Hidden_framework_inputs_are_not_flagged_as_labelless()
+    {
+        var agent = new AppAnalyzerAgent(new HttpClient());
+        var withToken = """
+            <html lang="en"><head><title>App</title></head><body>
+            <form><label for="q">Search</label><input id="q" required>
+            <input name="__RequestVerificationToken" type="hidden" value="tok"></form>
+            <p>Enough explanatory copy about the application purpose and behavior for the content check to pass with ease here.</p>
+            </body></html>
+            """;
+        var findings = agent.Analyze(withToken, "forms");
+        Assert.DoesNotContain(findings, f => f.Observation.Contains("label"));
+        Assert.DoesNotContain(findings, f => f.Observation.Contains("required-field"));
+    }
+
+    [Fact]
     public void Analyze_clean_page_produces_no_false_positives()
     {
         var agent = new AppAnalyzerAgent(new HttpClient());

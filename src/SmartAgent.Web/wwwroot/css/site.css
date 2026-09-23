@@ -27,11 +27,11 @@ textarea { min-height: 70px; resize: vertical; }
 .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
 .source-tabs { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-.source-tabs a {
+.source-tabs a, .source-tabs button { font: inherit;
     padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border);
     color: var(--text); text-decoration: none; font-size: 13px; font-weight: 600;
 }
-.source-tabs a.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.source-tabs a.active, .source-tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 button {
     margin-top: 20px; background: var(--accent); color: #fff; border: 0; border-radius: 6px;
@@ -58,3 +58,5 @@ th { color: var(--muted); font-weight: 600; }
 .sev-low { background: #23414d; color: #8fd6ff; }
 .warn { color: var(--muted); font-size: 12px; }
 .actions a { color: var(--accent); text-decoration: none; margin-right: 18px; font-weight: 600; }
+
+.source-tabs button { cursor: pointer; }

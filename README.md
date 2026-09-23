@@ -227,6 +227,33 @@ Safety model:
 
 UI: `/Home/AnalyzeApp`.
 
+### Automatic parallel prompt resolution (no opt-in)
+
+**Every** prompt the engine builds — regardless of source or endpoint — is automatically
+reviewed, split into independent work-unit threads, processed concurrently, and
+consolidated into a single report before the run completes. There is no flag to set.
+
+How it works per run:
+1. **Review** — the built prompt is decomposed into work units (scope), each with a
+   depth estimate (1–5) and relative cost.
+2. **Split** — units are distributed across balanced parallel lanes; the thread width is
+   `min(units, MaxThreads)` (default: CPU count, min 2; bound it per request with `maxThreads`).
+3. **Process** — lanes run concurrently; per-unit timeout, one retry, failures reported,
+   never swallowed.
+4. **Consolidate** — results merge into one report: units, threads, failures, total effort,
+   dominant risk, and a scope-satisfied check (every unit accounted for).
+
+Every validate response carries it:
+
+```json
+"parallel": { "autoParallel": true, "units": 12, "threads": 4, "unitsFailed": 0,
+              "scopeSatisfied": true, "dominantRisk": "Low", "totalEffort": 232, "elapsedMs": 0 }
+```
+
+Live-verified against the repo itself: 26 findings → scoped prompt → 12 work units
+across 4 threads, 0 failures, scope satisfied. Standalone use (`any prompt`, no source
+needed) stays available at `POST /api/evaluate-prompt`.
+
 ## Build & run
 
 ```bash

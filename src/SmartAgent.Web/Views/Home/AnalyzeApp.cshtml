@@ -7,8 +7,8 @@
     <p class="sub">Point the agent at a live page — localhost included — and describe what to focus on. The agent fetches the page, runs static analysis against your focus areas, and converts each finding into a backlog story with a chained prompt. Every downstream gate stays human.</p>
     <form asp-action="AnalyzeApp" method="post">
         @Html.AntiForgeryToken()
-        <p><input asp-for="Url" placeholder="http://localhost:5199/" /></p>
-        <p><textarea asp-for="Prompt" rows="3" placeholder="Example: focus on accessibility and security of the navigation and forms"></textarea></p>
+        <p><label asp-for="Url">Target URL (localhost welcome)</label><input asp-for="Url" required placeholder="http://localhost:5199/" /></p>
+        <p><label asp-for="Prompt">Focus prompt</label><textarea asp-for="Prompt" rows="3" required placeholder="Example: focus on accessibility and security of the navigation and forms"></textarea></p>
         <div class="actions"><button type="submit">Analyze the app</button></div>
         <div asp-validation-summary="All" class="warn"></div>
     </form>

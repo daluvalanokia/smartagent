@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\SmartAgent.Core\SmartAgent.Core.csproj" />
+    <ProjectReference Include="..\..\src\SmartAgent.Integrations\SmartAgent.Integrations.csproj" />
     <ProjectReference Include="..\..\src\SmartAgent.SourceProviders\SmartAgent.SourceProviders.csproj" />
   </ItemGroup>
 </Project>

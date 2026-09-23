@@ -7,7 +7,7 @@
     <p class="sub">Submit a business idea. Role agents (BA, PM, Developer, QA, CI, Learning) do the work; humans own every gate. The demo walks the first story through the full lifecycle, recording each AI action in the governance audit trail.</p>
     <form asp-action="Saael" method="post">
         @Html.AntiForgeryToken()
-        <p><textarea asp-for="Idea" rows="5" placeholder="Example: Customers need a system that automatically analyzes service requests and routes them to the appropriate department with a confidence score and a human review fallback."></textarea></p>
+        <p><label asp-for="Idea">Business idea</label><textarea asp-for="Idea" rows="5" required placeholder="Example: Customers need a system that automatically analyzes service requests and routes them to the appropriate department with a confidence score and a human review fallback."></textarea></p>
         <div class="actions"><button type="submit">Run the lifecycle</button></div>
         <div asp-validation-summary="All" class="warn"></div>
     </form>
