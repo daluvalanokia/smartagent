@@ -45,12 +45,11 @@ public sealed class SmartAgentEngine(
             warnings.AddRange(await reasoningService.EnrichAsync(findings, snapshot, ct));
 
             var scoped = prioritizer.Scope(findings, options);
-            var prompt = await promptBuilder.BuildAsync(snapshot, scoped, options, continuity, runId, ct);
-            prompts.Add(prompt);
+            var built = await promptBuilder.BuildAsync(snapshot, scoped, options, continuity, runId, ct);
 
             // AUTOMATIC PARALLEL RESOLUTION: review the prompt, split it into work-unit
             // threads, process them on parallel lanes, consolidate. Applies to every prompt.
-            parallelReport = await promptEvaluator.EvaluateAsync(prompt.Prompt,
+            parallelReport = await promptEvaluator.EvaluateAsync(built.Prompt,
                 new EvaluationOptions
                 {
                     MaxThreads = options.MaxThreads ?? EvaluationOptions.Default.MaxThreads,
@@ -60,6 +59,9 @@ public sealed class SmartAgentEngine(
             if (parallelReport.UnitsFailed > 0)
                 warnings.Add($"parallel evaluation: {parallelReport.UnitsFailed} thread unit(s) failed and were reported, not swallowed.");
 
+            // Execution statement in the prompt itself: multiple items run in parallel, or one task.
+            var prompt = PromptBuilder.WithExecutionStatement(built, parallelReport);
+            prompts.Add(prompt);
             continuityRegistry.CommitRun(targetKey, runId, prompt.Title);
         }
         else

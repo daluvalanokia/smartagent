@@ -75,6 +75,49 @@ public class AutoParallelPipelineTests
         Assert.InRange(result.ParallelReport!.Plan.Width, 1, 2);
     }
 
+    [Fact]
+    public async Task Prompt_carries_the_parallel_execution_statement()
+    {
+        var engine = NewEngine();
+        var result = await engine.RunAsync(
+            new SourceRequest { SourceType = SourceType.Website, Url = "https://example.com/app" },
+            new RunOptions { ScopeLimit = 12 });   // wide scope -> multi-unit prompt
+
+        var text = result.Prompts.Single().Prompt;
+        Assert.Contains("# Execution", text);
+        Assert.Contains("resolved by the agent into", text);
+        Assert.Contains("work items and processed in parallel on", text);
+        Assert.Contains("thread(s)", text);
+    }
+
+    [Fact]
+    public void Single_unit_prompt_carries_the_single_task_statement()
+    {
+        var report = new EvaluationReport
+        {
+            Plan = new ExecutionPlan
+            {
+                PromptPreview = "p",
+                Units = [new WorkUnit { Id = "u1", Order = 0, Text = "one thing", Depth = 1, Cost = 1, Source = "segment" }],
+                Width = 1,
+                Waves = [["u1"]],
+                TotalCost = 1,
+                AverageDepth = 1
+            },
+            UnitsEvaluated = 1,
+            WavesExecuted = 1,
+            ScopeSatisfied = true
+        };
+        var prompt = PromptBuilder.WithExecutionStatement(new GeneratedPrompt
+        {
+            Title = "t", Prompt = "body\n\n# Execution\n- default placeholder\n\n# Acceptance criteria\n- x", TargetFindings = [], Composer = "heuristic"
+        }, report);
+
+        Assert.Contains("resolved by the agent as a single task item", prompt.Prompt);
+        Assert.DoesNotContain("default placeholder", prompt.Prompt);
+        Assert.Contains("# Acceptance criteria", prompt.Prompt);   // following sections preserved
+    }
+
     // ---------- test doubles ----------
 
     private sealed class StubSourceProvider : ISourceProvider

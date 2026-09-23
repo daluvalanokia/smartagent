@@ -243,6 +243,12 @@ How it works per run:
 4. **Consolidate** — results merge into one report: units, threads, failures, total effort,
    dominant risk, and a scope-satisfied check (every unit accounted for).
 
+The prompt itself carries the outcome as an `# Execution` statement, so any coding agent
+reading it knows how it was processed:
+- multiple items → "resolved by the agent into N work items and processed in parallel
+  on W thread(s) across V wave(s)"
+- one task → "reviewed and resolved by the agent as a single task item".
+
 Every validate response carries it:
 
 ```json

@@ -174,6 +174,10 @@ public sealed class PromptBuilder(IChatCompletionClient chatClient)
         if (!string.IsNullOrWhiteSpace(options.Notes)) { sb.AppendLine(); sb.AppendLine($"Operator context: {options.Notes}"); }
 
         sb.AppendLine();
+        sb.AppendLine("# Execution");
+        sb.AppendLine("- This task list was reviewed and resolved by the agent as a single task item — no parallel split was needed.");
+
+        sb.AppendLine();
         sb.AppendLine("# Verification of previous fixes");
         sb.AppendLine("- Every finding previously reported as fixed must remain fixed in the touched files; a reappearing finding is a regression and fails this run.");
 
@@ -189,5 +193,44 @@ public sealed class PromptBuilder(IChatCompletionClient chatClient)
         sb.AppendLine("2. Re-run validation for the same target (POST /api/validate) and compare continuity: regressions must be 0 before promoting the build.");
         sb.AppendLine("3. The next generated prompt will automatically verify these fixes and escalate anything unresolved.");
         return sb;
+    }
+
+    /// <summary>
+    /// Amends a built prompt with the execution statement that reflects what the agent
+    /// actually did: resolved into multiple work items processed in parallel, or a
+    /// single task item. Replaces the default single-task note rendered at build time.
+    /// </summary>
+    public static GeneratedPrompt WithExecutionStatement(GeneratedPrompt prompt, EvaluationReport report)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+        ArgumentNullException.ThrowIfNull(report);
+
+        var parallel = report.Plan.Units.Count > 1;
+        string note = parallel
+            ? $"- This task was resolved by the agent into {report.Plan.Units.Count} work items and processed in parallel on {report.Plan.Width} thread(s) across {report.WavesExecuted} wave(s); all items are consolidated here."
+              + (report.UnitsFailed > 0 ? $" {report.UnitsFailed} item(s) failed and are reported in the run warnings." : "")
+            : "- This task was reviewed and resolved by the agent as a single task item — no parallel split was needed.";
+        var section = "# Execution" + Environment.NewLine + note;
+
+        var text = prompt.Prompt;
+        var start = text.IndexOf("# Execution", StringComparison.Ordinal);
+        if (start >= 0)
+        {
+            var next = text.IndexOf(Environment.NewLine + "# ", start + 1, StringComparison.Ordinal);
+            var end = next >= 0 ? next : text.Length;
+            text = text[..start] + section + text[end..];
+        }
+        else
+        {
+            text = text.TrimEnd() + Environment.NewLine + Environment.NewLine + section;
+        }
+
+        return new GeneratedPrompt
+        {
+            Title = prompt.Title,
+            Prompt = text,
+            TargetFindings = prompt.TargetFindings,
+            Composer = prompt.Composer
+        };
     }
 }
