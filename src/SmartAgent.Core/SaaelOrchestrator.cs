@@ -16,7 +16,8 @@ public sealed class SaaelOrchestrator(
     DeveloperAgent developer,
     QaAgent qa,
     LearningAgent learning,
-    CiAgent ci)
+    CiAgent ci,
+    AppAnalyzerAgent appAnalyzer)
 {
     private readonly object _sync = new();
     private int _storySeq = 101;
@@ -401,6 +402,58 @@ public sealed class SaaelOrchestrator(
                 "executed", est: 600 + buildLog.Length / 4);
             return analysis;
         }
+    }
+
+    // ---------- browser app analysis: fetch → findings → suggested stories as prompts ----------
+
+    /// <summary>BROWSER-Agent: opens a browser-style fetch of the target (localhost allowed),
+    /// analyzes the page against the focus areas in the prompt, and converts findings into
+    /// backlog stories whose chained prompts feed the CI/CD pipeline. Stories are created
+    /// in state New — every downstream gate stays human.</summary>
+    public async Task<AppAnalysisReport> AnalyzeAppAsync(string url, string focusPrompt)
+    {
+        var uri = AppAnalyzerAgent.ValidateUrl(url);   // SSRF-safe guard: http/https only, no credentials
+        var (status, html) = await appAnalyzer.FetchAsync(uri);
+        var findings = appAnalyzer.Analyze(html, focusPrompt);
+        var suggestions = appAnalyzer.SuggestStories(findings, uri.ToString());
+
+        var created = new List<string>();
+        lock (_sync)
+        {
+            foreach (var sug in suggestions)
+            {
+                var id = $"SA-{_storySeq++:D3}";
+                _items[id] = new WorkItem
+                {
+                    Id = id, Title = sug.SuggestedTitle, Description = sug.Description,
+                    AcceptanceCriteria = sug.AcceptanceCriteria,
+                    NonFunctionalRequirements = ["Human review required before build", "No regressions on the analyzed page"],
+                    Risk = sug.Risk, StoryPoints = sug.StoryPoints, Priority = sug.Priority,
+                    State = LifecycleState.New, Level = AutomationLevel.L2_ApprovedExecution
+                };
+                created.Add(id);
+                _trace.Add(new TraceLink { StoryId = id, Type = TraceLinkType.Requirement, TargetRef = $"browser-analysis:{uri}" });
+            }
+
+            Record("BROWSER-Agent-03", "app-analysis", $"GET {uri} (status {status}); focus: {Trim(focusPrompt, 80)}",
+                $"{findings.Count} finding(s), {created.Count} story suggestion(s) created in backlog — every gate downstream stays human",
+                BudgetExceeded ? "budget-limited-recommendation" : "executed",
+                est: 900 + html.Length / 4);
+        }
+
+        var title = System.Text.RegularExpressions.Regex.Match(html, @"<title[^>]*>(.*?)</title>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline).Groups[1].Value.Trim();
+
+        return new AppAnalysisReport
+        {
+            Url = uri.ToString(), FocusPrompt = focusPrompt, StatusCode = status, PageTitle = title,
+            Findings = findings, StorySuggestions = suggestions, CreatedStoryIds = created,
+            Summary = findings.Count == 0
+                ? $"No static-analysis findings on {uri} for the requested focus areas."
+                : $"{findings.Count} finding(s) on {uri}: {findings.Count(f => f.Severity == "High")} high, " +
+                  $"{findings.Count(f => f.Severity == "Medium")} medium, {findings.Count(f => f.Severity == "Low")} low. " +
+                  $"{created.Count} story suggestion(s) added to the backlog as chained prompts."
+        };
     }
 
     // ---------- queries ----------

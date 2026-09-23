@@ -368,6 +368,17 @@ public sealed class ApiController(
         return Ok(new { result = saael.Rollback(body.StoryId, body.Reason ?? "manual", body.Actor, body.ErrorRate) });
     }
 
+    /// <summary>BROWSER-Agent: fetch a live page (localhost allowed), analyze it against the
+    /// prompt's focus areas, and get suggested stories as chained prompts (added to the backlog).</summary>
+    [HttpPost("saael/analyze-app")]
+    public async Task<IActionResult> AnalyzeApp([FromBody] SaaelAnalyzeAppRequest body)
+    {
+        if (string.IsNullOrWhiteSpace(body?.Url) || string.IsNullOrWhiteSpace(body.Prompt))
+            return BadRequest(new { error = "url and prompt are required." });
+        try { return Ok(await saael.AnalyzeAppAsync(body.Url, body.Prompt)); }
+        catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
     /// <summary>Full story state: item, open approvals, traceability chain, governance records.</summary>
     [HttpGet("saael/story/{storyId}")]
     public IActionResult Story(string storyId)
@@ -641,6 +652,8 @@ public sealed class SaaelRollbackRequest
 public sealed class SaaelResolveRequest { public string? AmbiguityId { get; set; } public string? Resolution { get; set; } public string? Actor { get; set; } }
 public sealed class SaaelSprintDecisionRequest { public string? ProposalId { get; set; } public string? Actor { get; set; } public bool Approve { get; set; } = true; }
 public sealed class SaaelChangeDecisionRequest { public string? Actor { get; set; } public string? Decision { get; set; } }
+
+public sealed class SaaelAnalyzeAppRequest { public string? Url { get; set; } public string? Prompt { get; set; } }
 
 public sealed class TargetSummaryDto
 {

@@ -153,6 +153,37 @@ public class HomeController(SmartAgentEngine engine, RunStore runStore, PromptEv
         }
     }
 
+    // ---------- BROWSER-Agent: live app analysis → story suggestions ----------
+
+    [HttpGet]
+    public IActionResult AnalyzeApp() => View(new AnalyzeAppInput());
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AnalyzeApp(AnalyzeAppInput input)
+    {
+        if (string.IsNullOrWhiteSpace(input.Url) || string.IsNullOrWhiteSpace(input.Prompt))
+        {
+            ModelState.AddModelError(nameof(input.Url), "Both a URL and a focus prompt are required.");
+            return View(input);
+        }
+        try
+        {
+            var report = await saael.AnalyzeAppAsync(input.Url, input.Prompt);
+            var vm = new AnalyzeAppResultViewModel
+            {
+                Report = report,
+                Stories = saael.Backlog().Where(s => report.CreatedStoryIds.Contains(s.Id)).ToList()
+            };
+            return View("AnalyzeAppResult", vm);
+        }
+        catch (ArgumentException ex)
+        {
+            ModelState.AddModelError(nameof(input.Url), ex.Message);
+            return View(input);
+        }
+    }
+
     // ---------- SAAEL: AI-orchestrated agile lifecycle demo ----------
 
     [HttpGet]

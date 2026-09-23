@@ -75,6 +75,8 @@ builder.Services.AddSingleton<QaAgent>();
 builder.Services.AddSingleton<CiAgent>();
 builder.Services.AddSingleton<LearningAgent>();
 builder.Services.AddSingleton<SaaelOrchestrator>();
+builder.Services.AddSingleton(new HttpClient { Timeout = TimeSpan.FromSeconds(15) });
+builder.Services.AddSingleton<AppAnalyzerAgent>();
 
 // In-memory store of run results (bounded; demo-suitable).
 builder.Services.AddSingleton<RunStore>();

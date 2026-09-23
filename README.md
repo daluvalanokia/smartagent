@@ -202,6 +202,31 @@ Safety model:
 UI demo: `/Home/Saael` walks an idea through the full lifecycle with every human
 decision recorded.
 
+### Browser App Analysis (BROWSER-Agent)
+
+The agent can open a browser-style fetch of any live page — **localhost included** —
+analyze it against the focus areas named in your prompt, and convert every finding
+into a backlog story with a chained prompt that feeds the CI/CD pipeline.
+
+```bash
+curl -X POST /api/saael/analyze-app \
+  -d '{"url":"http://localhost:5199/","prompt":"focus on accessibility, security of navigation, and forms"}'
+```
+
+Safety model:
+- **SSRF-safe URL guard** — http/https only; `javascript:`, `data:`, `file:`, `ftp:` and
+  URLs with embedded credentials are rejected before any fetch.
+- **Bounded fetch** — 10s timeout, 2 MB analysis cap, no cookie jar, no script execution.
+- **Focus-driven analysis** — findings matching your prompt's focus areas are flagged (★);
+  checks cover accessibility, security (inline handlers, mixed content, `javascript:` links,
+  unsafe `target=_blank`), navigation (dead links, nav landmarks), forms (labelless inputs,
+  missing validation), performance (script count, viewport) and SEO/content.
+- **Stories, not actions** — findings become backlog stories (security findings are High
+  risk, so human gates stay mandatory). Nothing is fixed without the full human-gated lifecycle.
+- Chained prompts are ready to run through the continuity-gated CI/CD pipeline.
+
+UI: `/Home/AnalyzeApp`.
+
 ## Build & run
 
 ```bash

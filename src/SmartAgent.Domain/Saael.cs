@@ -190,3 +190,43 @@ public sealed class CiAnalysis
     public double Confidence { get; init; }
     public bool DeveloperReviewRequired { get; init; } = true;
 }
+
+// ---------- Browser App Analysis (App Analyzer Agent) ----------
+
+/// <summary>A static-analysis finding on a fetched web page (browser-mode inspection).</summary>
+public sealed class AppFinding
+{
+    public required string Area { get; init; }            // Accessibility | Security | Performance | SEO | Content | Navigation | Forms
+    public required string Severity { get; init; }        // High | Medium | Low
+    public required string Observation { get; init; }
+    public required string Suggestion { get; init; }
+    /// <summary>True when the finding matched one of the focus areas in the user's prompt.</summary>
+    public bool PromptFocused { get; init; }
+}
+
+/// <summary>A finding converted into a backlog-ready story with a chained prompt for the CI/CD pipeline.</summary>
+public sealed class StorySuggestion
+{
+    public required string SuggestedTitle { get; init; }
+    public required string Description { get; init; }
+    public required IReadOnlyList<string> AcceptanceCriteria { get; init; }
+    public required string Risk { get; init; }            // High findings → High risk → human gates stay
+    public int StoryPoints { get; init; } = 3;
+    public int Priority { get; init; } = 2;
+    /// <summary>Ready-to-run chained prompt that feeds the SmartAgent CI/CD prompt pipeline.</summary>
+    public required string ChainedPrompt { get; init; }
+}
+
+/// <summary>Result of one browser analysis pass: what was fetched, findings, suggested stories, created ids.</summary>
+public sealed class AppAnalysisReport
+{
+    public required string Url { get; init; }
+    public required string FocusPrompt { get; init; }
+    public int StatusCode { get; init; }
+    public required string PageTitle { get; init; }
+    public required IReadOnlyList<AppFinding> Findings { get; init; }
+    public required IReadOnlyList<StorySuggestion> StorySuggestions { get; init; }
+    /// <summary>Story ids actually created in the backlog from the suggestions (state New).</summary>
+    public required IReadOnlyList<string> CreatedStoryIds { get; init; }
+    public required string Summary { get; init; }
+}

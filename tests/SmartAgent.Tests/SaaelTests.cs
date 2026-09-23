@@ -7,7 +7,8 @@ namespace SmartAgent.Tests;
 public class SaaelTests
 {
     private static SaaelOrchestrator NewOrchestrator() => new(
-        new BaAgent(), new PmAgent(), new DeveloperAgent(), new QaAgent(), new LearningAgent(), new CiAgent());
+        new BaAgent(), new PmAgent(), new DeveloperAgent(), new QaAgent(), new LearningAgent(), new CiAgent(),
+        new AppAnalyzerAgent(new HttpClient()));
 
     private const string Idea =
         "Customers need a system that automatically analyzes service requests and routes them to the appropriate department with a confidence score and a human review fallback. The routing must respect data privacy rules.";

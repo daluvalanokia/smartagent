@@ -44,3 +44,15 @@ public sealed class SaaelDemoViewModel
     public required SmartAgent.Core.SaaelOrchestrator.TokenLedgerView Tokens { get; init; }
     public required IReadOnlyList<SmartAgent.Domain.GovernanceRecord> Governance { get; init; }
 }
+
+public class AnalyzeAppInput
+{
+    public string? Url { get; set; }
+    public string? Prompt { get; set; }
+}
+
+public sealed class AnalyzeAppResultViewModel
+{
+    public required SmartAgent.Domain.AppAnalysisReport Report { get; init; }
+    public required IReadOnlyList<SmartAgent.Domain.WorkItem> Stories { get; init; }
+}

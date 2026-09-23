@@ -1,0 +1,57 @@
+@model SmartAgent.Web.Models.AnalyzeAppResultViewModel
+@{
+    ViewData["Title"] = "Analysis Results";
+}
+<div class="actions"><a href="/Home/AnalyzeApp">&larr; analyze another page</a></div>
+
+<div class="stat-row">
+    <div class="stat"><div class="v">@Model.Report.StatusCode</div><div class="k">HTTP STATUS</div></div>
+    <div class="stat"><div class="v">@Model.Report.Findings.Count</div><div class="k">FINDINGS</div></div>
+    <div class="stat"><div class="v">@Model.Report.StorySuggestions.Count</div><div class="k">SUGGESTED STORIES</div></div>
+</div>
+
+<div class="panel">
+    <h1>@Model.Report.Url</h1>
+    <div class="sub">page title: @(string.IsNullOrEmpty(Model.Report.PageTitle) ? "(none)" : Model.Report.PageTitle)</div>
+    <div class="prompt-box">@Model.Report.Summary</div>
+    <h2>Findings</h2>
+    <table>
+        <tr><th>Area</th><th>Severity</th><th>Observation</th><th>Suggestion</th></tr>
+        @foreach (var f in Model.Report.Findings)
+        {
+            <tr>
+                <td>@f.Area @(f.PromptFocused ? "★" : "")</td>
+                <td>@f.Severity</td>
+                <td>@f.Observation</td>
+                <td>@f.Suggestion</td>
+            </tr>
+        }
+    </table>
+    <div class="sub">★ = matched a focus area in your prompt</div>
+</div>
+
+<div class="panel">
+    <h1>Suggested stories (chained prompts, now in the backlog)</h1>
+    @foreach (var s in Model.Report.StorySuggestions)
+    {
+        <div>
+            <b>@s.SuggestedTitle</b> <span class="sub">(@s.Risk risk, @s.StoryPoints pt, P@s.Priority)</span>
+        </div>
+        <ul>
+            @foreach (var ac in s.AcceptanceCriteria) { <li>@ac</li> }
+        </ul>
+        <div class="prompt-box">@s.ChainedPrompt</div>
+    }
+</div>
+
+<div class="panel">
+    <h1>Created backlog stories</h1>
+    <ul>
+        @foreach (var id in Model.Report.CreatedStoryIds)
+        {
+            var story = Model.Stories.FirstOrDefault(x => x.Id == id);
+            <li><b>@id</b> — @(story?.Title) <span class="sub">[state: @(story?.State), risk: @(story?.Risk)]</span></li>
+        }
+    </ul>
+    <div class="sub">These stories now flow through the SAAEL lifecycle — human BA, Dev Manager, QA and release gates all apply.</div>
+</div>
