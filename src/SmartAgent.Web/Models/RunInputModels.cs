@@ -26,3 +26,21 @@ public class PromptEvaluationInput
     /// <summary>Max concurrent evaluation threads (blank = CPU count).</summary>
     public int? MaxThreads { get; set; }
 }
+
+public class SaaelInput
+{
+    public string? Idea { get; set; }
+}
+
+public sealed record SaaelStep(string Stage, string Who, string What, string Result);
+
+public sealed class SaaelDemoViewModel
+{
+    public required string Idea { get; init; }
+    public required SmartAgent.Core.SaaelOrchestrator.SaaelPlanView Plan { get; init; }
+    public required IReadOnlyList<string> Walk { get; init; }
+    public required SmartAgent.Domain.ReleaseReadinessReport Readiness { get; init; }
+    public required IReadOnlyList<SmartAgent.Domain.SprintInsight> Insights { get; init; }
+    public required SmartAgent.Core.SaaelOrchestrator.TokenLedgerView Tokens { get; init; }
+    public required IReadOnlyList<SmartAgent.Domain.GovernanceRecord> Governance { get; init; }
+}

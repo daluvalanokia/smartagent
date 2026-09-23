@@ -20,6 +20,7 @@ public sealed class ApiController(
     RunStore runStore,
     ContinuityRegistry continuity,
     PromptEvaluator promptEvaluator,
+    SaaelOrchestrator saael,
     IConfiguration config) : ControllerBase
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -239,6 +240,160 @@ public sealed class ApiController(
             return BadRequest(new { error = ex.Message });
         }
     }
+
+
+    // ---------- SAAEL: AI-orchestrated agile lifecycle (role agents + human gates) ----------
+
+    /// <summary>Stage 0-6: business idea → stories, acceptance criteria, NFRs,
+    /// ambiguities (BA gate input) and a sprint PROPOSAL pending PM+PO approval.</summary>
+    [HttpPost("saael/idea")]
+    public IActionResult SubmitIdea([FromBody] SaaelIdeaRequest body)
+    {
+        if (string.IsNullOrWhiteSpace(body?.Idea) || body.Idea.Trim().Length < 20)
+            return BadRequest(new { error = "idea is required (at least 20 characters)." });
+        var view = saael.SubmitIdea(body.Idea);
+        return Ok(view);
+    }
+
+    /// <summary>Attempts the next lifecycle transition for a story. Human gates
+    /// return status=awaiting-approval with the open approval request.</summary>
+    [HttpPost("saael/advance")]
+    public IActionResult Advance([FromBody] SaaelAdvanceRequest body)
+    {
+        if (string.IsNullOrWhiteSpace(body?.StoryId)) return BadRequest(new { error = "storyId is required." });
+        try { return Ok(saael.Advance(body.StoryId, body.Actor)); }
+        catch (ArgumentException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    /// <summary>Human BA resolves an ambiguity raised during decomposition (BA gate precondition).</summary>
+    [HttpPost("saael/resolve-ambiguity")]
+    public IActionResult ResolveAmbiguity([FromBody] SaaelResolveRequest body)
+    {
+        if (string.IsNullOrWhiteSpace(body?.AmbiguityId) || string.IsNullOrWhiteSpace(body.Resolution) || string.IsNullOrWhiteSpace(body.Actor))
+            return BadRequest(new { error = "ambiguityId, resolution and actor are required." });
+        try
+        {
+            saael.ResolveAmbiguity(body.AmbiguityId, body.Resolution, body.Actor);
+            return Ok(new { status = "resolved" });
+        }
+        catch (ArgumentException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    /// <summary>Human PM+PO decision on a sprint proposal (recommendation is never self-approved).</summary>
+    [HttpPost("saael/sprint-decision")]
+    public IActionResult SprintDecision([FromBody] SaaelSprintDecisionRequest body)
+    {
+        if (string.IsNullOrWhiteSpace(body?.ProposalId) || string.IsNullOrWhiteSpace(body.Actor))
+            return BadRequest(new { error = "proposalId and actor are required." });
+        try
+        {
+            saael.DecideSprint(body.ProposalId, body.Actor, body.Approve);
+            return Ok(new { status = body.Approve ? "approved" : "rejected" });
+        }
+        catch (ArgumentException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    /// <summary>Human Development Manager decision on a Developer Agent change proposal.</summary>
+    [HttpPost("saael/change-decision/{storyId}")]
+    public IActionResult ChangeDecision(string storyId, [FromBody] SaaelChangeDecisionRequest body)
+    {
+        if (body is null || string.IsNullOrWhiteSpace(body.Actor) || string.IsNullOrWhiteSpace(body.Decision))
+            return BadRequest(new { error = "actor and decision (Accepted|Modified|Rejected) are required." });
+        try
+        {
+            saael.DecideChange(storyId, body.Actor, body.Decision);
+            return Ok(new { status = body.Decision });
+        }
+        catch (ArgumentException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    /// <summary>Records a human decision on an approval request (the human-in-the-loop gate).</summary>
+    [HttpPost("saael/approve")]
+    public IActionResult Approve([FromBody] SaaelApproveRequest body)
+    {
+        if (body is null || string.IsNullOrWhiteSpace(body.ApprovalId) || string.IsNullOrWhiteSpace(body.Actor))
+            return BadRequest(new { error = "approvalId and actor are required." });
+        try
+        {
+            saael.DecideApproval(body.ApprovalId, body.Role, body.Actor, body.Approved, body.Notes ?? "");
+            return Ok(new { status = "recorded" });
+        }
+        catch (ArgumentException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    /// <summary>Developer Agent change proposal for a story (proposal only — never auto-code).</summary>
+    [HttpPost("saael/proposal/{storyId}")]
+    public IActionResult ProposeChange(string storyId)
+    {
+        try { return Ok(saael.ProposeChange(storyId)); }
+        catch (ArgumentException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    /// <summary>QA Agent scenario generation (normal/boundary/negative/security/performance/regression).</summary>
+    [HttpPost("saael/qa-scenarios/{storyId}")]
+    public IActionResult QaScenarios(string storyId)
+    {
+        try { return Ok(saael.GenerateQaScenarios(storyId)); }
+        catch (ArgumentException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    /// <summary>Release-readiness engine: checks + outstanding human approvals (§15).</summary>
+    [HttpGet("saael/readiness/{storyId}")]
+    public IActionResult Readiness(string storyId)
+    {
+        try { return Ok(saael.Readiness(storyId)); }
+        catch (ArgumentException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    /// <summary>CI root-cause analysis: "Build failed" → cause, likely commit, affected tests, fix, confidence.</summary>
+    [HttpPost("saael/ci-analyze")]
+    public IActionResult CiAnalyze([FromBody] SaaelBuildLogRequest body)
+    {
+        if (string.IsNullOrWhiteSpace(body?.BuildLog)) return BadRequest(new { error = "buildLog is required." });
+        return Ok(saelAnalyze(body.BuildLog));
+    }
+
+    private object saelAnalyze(string buildLog) => saael.AnalyzeBuildFailure(buildLog);
+
+    /// <summary>Data-driven retrospective insights from the Learning Agent (§19).</summary>
+    [HttpGet("saael/retrospective")]
+    public IActionResult Retrospective() => Ok(saael.Retrospective());
+
+    /// <summary>Progressive-delivery rollback: with actor = human-authorized;
+    /// without actor = policy-authorized auto-rollback, only at level L4.</summary>
+    [HttpPost("saael/rollback")]
+    public IActionResult Rollback([FromBody] SaaelRollbackRequest body)
+    {
+        if (string.IsNullOrWhiteSpace(body?.StoryId)) return BadRequest(new { error = "storyId is required." });
+        return Ok(new { result = saael.Rollback(body.StoryId, body.Reason ?? "manual", body.Actor, body.ErrorRate) });
+    }
+
+    /// <summary>Full story state: item, open approvals, traceability chain, governance records.</summary>
+    [HttpGet("saael/story/{storyId}")]
+    public IActionResult Story(string storyId)
+    {
+        try
+        {
+            return Ok(new
+            {
+                story = saael.Backlog().FirstOrDefault(s => s.Id == storyId),
+                approvals = saael.OpenApprovals(storyId),
+                trace = saael.Trace(storyId),
+                governance = saael.Governance().Where(g => g.InputSummary.Contains(storyId) || g.OutputSummary.Contains(storyId)).TakeLast(20)
+            });
+        }
+        catch (ArgumentException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    [HttpGet("saael/backlog")]
+    public IActionResult Backlog() => Ok(saelBacklog());
+
+    private object saelBacklog() => new { stories = saael.Backlog(), tokenLedger = saael.Tokens(), openApprovals = saael.OpenApprovals() };
+
+    [HttpGet("saael/token-usage")]
+    public IActionResult TokenUsage() => Ok(saelTokens());
+
+    private object saelTokens() => saael.Tokens();
 
     [HttpGet("health")]
     public IActionResult Health() => Ok(new { status = "ok", service = "SmartAgent CI/CD prompt pipeline" });
@@ -461,6 +616,31 @@ public sealed class UnitResultDto
     public int Attempts { get; set; }
     public long ElapsedMs { get; set; }
 }
+
+public sealed class SaaelIdeaRequest { public string? Idea { get; set; } }
+public sealed class SaaelAdvanceRequest { public string? StoryId { get; set; } public string? Actor { get; set; } }
+public sealed class SaaelApproveRequest
+{
+    public string? ApprovalId { get; set; }
+    public HumanRole Role { get; set; }
+    public string? Actor { get; set; }
+    public bool Approved { get; set; } = true;
+    public string? Notes { get; set; }
+}
+public sealed class SaaelBuildLogRequest { public string? BuildLog { get; set; } }
+public sealed class SaaelRollbackRequest
+{
+    public string? StoryId { get; set; }
+    public string? Reason { get; set; }
+    /// <summary>Human authorizer; when null the rollback is policy-authorized (L4 only).</summary>
+    public string? Actor { get; set; }
+    /// <summary>When set and no actor: policy-authorized auto-rollback (L4 only, threshold 5%).</summary>
+    public double? ErrorRate { get; set; }
+}
+
+public sealed class SaaelResolveRequest { public string? AmbiguityId { get; set; } public string? Resolution { get; set; } public string? Actor { get; set; } }
+public sealed class SaaelSprintDecisionRequest { public string? ProposalId { get; set; } public string? Actor { get; set; } public bool Approve { get; set; } = true; }
+public sealed class SaaelChangeDecisionRequest { public string? Actor { get; set; } public string? Decision { get; set; } }
 
 public sealed class TargetSummaryDto
 {

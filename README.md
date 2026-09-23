@@ -150,6 +150,58 @@ Response contract:
 
 Unreachable sites degrade to warnings — the run continues.
 
+## SAAEL — Autonomous Agile Engineering Lifecycle (AI role agents + human gates)
+
+The orchestrator layer turns the prompt pipeline into a human-in-the-loop engineering
+lifecycle: **AI performs work; humans own decisions.**
+
+```
+idea → BA decomposition → sprint proposal (PM+PO approve)
+     → change proposal (Dev Mgr accepts) → QA scenarios → build/CI analysis
+     → QA gate → business validation → staging → UAT
+     → release readiness → 3-role release authorization → production
+     → telemetry → learning agent → next sprint
+```
+
+Role agents (deterministic, auditable): `BaAgent` (stories + ambiguity detection),
+`PmAgent` (sprint proposal), `DeveloperAgent` (change proposal — never direct code),
+`QaAgent` (6 scenario categories + defect replay), `CiAgent` (build-failure root cause),
+`LearningAgent` (data-driven retrospectives).
+
+Safety model:
+- **Human gates** — BA, Dev Manager, Developer code review, QA Manager, Business User,
+  PO, and a 3-role release authorization (PO + QA Manager + Implementation Coordinator)
+  are required at every automation level.
+- **Automation levels L1–L4** — technical steps auto-execute at L3+; high-impact release
+  decisions never auto-execute; policy rollback (auto-rollback on >5% error rate) only at L4.
+- **Governance audit trail** — every agent action records agent id, input/output, tokens,
+  and human reviewer; traceability links requirement → story → code → test → release → telemetry.
+- **Token budget** — agent work is metered; when the budget is exhausted, agents are
+  demoted to recommendation-only and nothing auto-executes.
+- **CSRF/antiforgery** on all UI actions; role enforcement on every approval.
+
+### HTTP API
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/saael/idea` | business idea → stories + ambiguities + sprint proposal |
+| `POST /api/saael/sprint-decision` | human PM+PO decision on the sprint proposal |
+| `POST /api/saael/resolve-ambiguity` | human BA resolves an ambiguity (gate precondition) |
+| `POST /api/saael/advance` | attempt the next lifecycle transition (returns gate state) |
+| `POST /api/saael/approve` | record a human decision on an approval request |
+| `POST /api/saael/proposal/{id}` | Developer Agent change proposal (proposal only) |
+| `POST /api/saael/change-decision/{id}` | human Development Manager decision |
+| `POST /api/saael/qa-scenarios/{id}` | QA Agent scenario generation |
+| `GET  /api/saael/readiness/{id}` | release-readiness report (checks + outstanding approvals) |
+| `POST /api/saael/ci-analyze` | build failure → root-cause analysis |
+| `POST /api/saael/rollback` | human rollback, or policy rollback at L4 only |
+| `GET  /api/saael/retrospective` | Learning Agent insights |
+| `GET  /api/saael/story/{id}` | story state, approvals, trace, governance |
+| `GET  /api/saael/token-usage` | token ledger per agent |
+
+UI demo: `/Home/Saael` walks an idea through the full lifecycle with every human
+decision recorded.
+
 ## Build & run
 
 ```bash

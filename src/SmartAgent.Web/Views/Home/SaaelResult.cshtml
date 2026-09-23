@@ -1,0 +1,86 @@
+@model SmartAgent.Web.Models.SaaelDemoViewModel
+@{
+    ViewData["Title"] = "Lifecycle Run";
+}
+<div class="actions"><a href="/Home/Saael">&larr; another idea</a> <a href="/">&larr; new run</a></div>
+
+<div class="stat-row">
+    <div class="stat"><div class="v">@Model.Plan.Stories.Count</div><div class="k">STORIES</div></div>
+    <div class="stat"><div class="v">@Model.Plan.Ambiguities.Count</div><div class="k">AMBIGUITIES (BA GATE)</div></div>
+    <div class="stat"><div class="v">@Model.Walk.Count</div><div class="k">LIFECYCLE STEPS</div></div>
+    <div class="stat"><div class="v">@(Model.Readiness.ReadyForProduction ? "YES" : "NO")</div><div class="k">RELEASE READY</div></div>
+    <div class="stat"><div class="v">@Model.Tokens.Used</div><div class="k">TOKENS USED</div></div>
+</div>
+
+<div class="panel">
+    <h1>Story decomposition (BA-Agent)</h1>
+    <table>
+        <tr><th>Story</th><th>Title</th><th>Risk</th><th>Points</th><th>Priority</th></tr>
+        @foreach (var s in Model.Plan.Stories)
+        {
+            <tr><td><b>@s.Id</b></td><td>@s.Title</td><td>@s.Risk</td><td>@s.Points</td><td>@s.Priority</td></tr>
+        }
+    </table>
+    <h2>Ambiguities raised for the human BA</h2>
+    <table>
+        <tr><th>Id</th><th>Question</th></tr>
+        @foreach (var a in Model.Plan.Ambiguities)
+        {
+            <tr><td>@a.Id</td><td>@a.Question</td></tr>
+        }
+    </table>
+</div>
+
+<div class="panel">
+    <h1>First-story lifecycle walk (AI executes, humans approve)</h1>
+    @foreach (var line in Model.Walk)
+    {
+        var cls = line.Contains("[human]") ? "warn" : "";
+        <div class="@cls">@line</div>
+    }
+</div>
+
+<div class="panel">
+    <h1>Release readiness</h1>
+    <div class="prompt-box">@Model.Readiness.Summary</div>
+    <table>
+        <tr><th>Area</th><th>Status</th><th>Detail</th></tr>
+        @foreach (var c in Model.Readiness.Checks)
+        {
+            <tr><td>@c.Area</td><td>@c.Status</td><td>@c.Detail</td></tr>
+        }
+    </table>
+</div>
+
+<div class="panel">
+    <h1>Learning Agent — retrospective insights</h1>
+    @foreach (var i in Model.Insights)
+    {
+        <div><b>Observation:</b> @i.Observation</div>
+        <div><b>Suggested action:</b> @i.SuggestedAction <span class="sub">(recommendation, not an automatic management decision)</span></div>
+        <div class="sub">Evidence: @i.Evidence</div>
+    }
+</div>
+
+<div class="panel">
+    <h1>Token ledger</h1>
+    <div>Used @Model.Tokens.Used of @Model.Tokens.Budget tokens across @Model.Tokens.ByAgent.Count agent(s)</div>
+    <table>
+        <tr><th>Agent</th><th>Tokens</th></tr>
+        @foreach (var a in Model.Tokens.ByAgent)
+        {
+            <tr><td>@a.AgentId</td><td>@a.Tokens</td></tr>
+        }
+    </table>
+</div>
+
+<div class="panel">
+    <h1>Governance audit trail (AI engineering audit, §23)</h1>
+    <table>
+        <tr><th>Record</th><th>Agent</th><th>Action</th><th>Output</th><th>Reviewer</th><th>Tokens</th></tr>
+        @foreach (var g in Model.Governance)
+        {
+            <tr><td>@g.RecordId</td><td>@g.AgentId</td><td>@g.Action</td><td>@g.OutputSummary</td><td>@(g.HumanReviewer ?? "—")</td><td>@g.TokensUsed</td></tr>
+        }
+    </table>
+</div>

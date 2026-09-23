@@ -10,7 +10,8 @@ using SmartAgent.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews()
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddControllers();   // CI/CD API surface (api/validate, runs, feedback, targets)
 builder.Services.Configure<RunOptions>(o => { });  // sensible defaults from domain
 
@@ -65,6 +66,15 @@ builder.Services.AddSingleton<IWorkUnitEvaluator, HeuristicWorkUnitEvaluator>();
 builder.Services.AddSingleton<ParallelWorkExecutor>();
 builder.Services.AddSingleton<PromptConsolidator>();
 builder.Services.AddSingleton<PromptEvaluator>();
+
+// SAAEL — SmartAgent Autonomous Agile Engineering Lifecycle: role agents + orchestrator.
+builder.Services.AddSingleton<BaAgent>();
+builder.Services.AddSingleton<PmAgent>();
+builder.Services.AddSingleton<DeveloperAgent>();
+builder.Services.AddSingleton<QaAgent>();
+builder.Services.AddSingleton<CiAgent>();
+builder.Services.AddSingleton<LearningAgent>();
+builder.Services.AddSingleton<SaaelOrchestrator>();
 
 // In-memory store of run results (bounded; demo-suitable).
 builder.Services.AddSingleton<RunStore>();
